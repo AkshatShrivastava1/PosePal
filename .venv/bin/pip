@@ -1,4 +1,4 @@
-#!/Users/akkii/Documents/Personal/ai-trainer-backend/.venv/bin/python3.11
+#!/Users/max/Documents/GitHub/posepal/.venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys
