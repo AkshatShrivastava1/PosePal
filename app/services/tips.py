@@ -2,7 +2,7 @@ from typing import List
 from app.core.config import settings
 
 try:
-    import google.generativeai as genai
+    from google import genai
 except Exception:
     genai = None
 
@@ -43,14 +43,15 @@ def gemini_tips(exercise: str, flags: List[str], level: str) -> List[str]:
     if not settings.GEMINI_API_KEY or genai is None:
         return []
     try:
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
         prompt = (
             f"Give concise (<=5 bullets) coaching cues for a {exercise} at {level} level. "
             f"Flags: {', '.join(flags) if flags else 'none'}. "
             "Be actionable, short, and safe; no medical advice."
         )
-        resp = model.generate_content(prompt)
+        resp = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt)
         text = (getattr(resp, "text", None) or "").strip()
         lines = [l.strip("-• ").strip() for l in text.splitlines() if l.strip()][:5]
         return lines or ([text] if text else [])
