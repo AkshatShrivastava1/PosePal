@@ -22,6 +22,7 @@ Credits:
 - OpenCV: https://opencv.org/
 """
 
+from frame_processor import annotate_image, get_landmark_coordinates
 import cv2
 import time
 import math as m
@@ -87,9 +88,6 @@ if __name__ == "__main__":
     frame_size = (width, height)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
-    # Video writer.
-    video_output = cv2.VideoWriter('output.mp4', fourcc, fps, frame_size)
-
     while cap.isOpened():
         # Capture frames.
         success, image = cap.read()
@@ -110,18 +108,8 @@ if __name__ == "__main__":
         # Convert the image back to BGR.
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-        # Use lm and lmPose as representative of the following methods.
-        lm = keypoints.pose_landmarks
-        lmPose = mp_pose.PoseLandmark
-        if lm is not None:
-            for idx, landmark in enumerate(lm.landmark):
-                if ((landmark.HasField('visibility') and landmark.visibility < 0.5) or
-                    (landmark.HasField('presence') and landmark.presence < 0.5)):
-                    continue
-                cv2.circle(image, (int(landmark.x*w), int(landmark.y*h)), 7, yellow, -1)
-
-        # Write frames.
-        video_output.write(image)
+        coordinates = get_landmark_coordinates(keypoints, w, h)
+        image = annotate_image(image, coordinates, w, h)
 
         # Display.
         cv2.imshow('MediaPipe Pose', image)
