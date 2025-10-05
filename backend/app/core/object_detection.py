@@ -55,7 +55,6 @@ pose = mp_pose.Pose()
 
 if __name__ == "__main__":
     # For webcam input replace file name with 0.
-    file_name = 'src/input.mp4'
     cap = cv2.VideoCapture(0)
 
     # Meta.
@@ -63,7 +62,6 @@ if __name__ == "__main__":
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_size = (width, height)
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
     while cap.isOpened():
         # Capture frames.
