@@ -7,17 +7,12 @@ def findDistance(x1, y1, x2, y2):
     dist = m.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
     return dist
 
-
 # Calculate angle.
 def findAngle(x1, y1, x2, y2):
     theta = m.acos((y2 - y1) * (-y1) / (m.sqrt(
         (x2 - x1) ** 2 + (y2 - y1) ** 2) * y1))
     degree = int(180 / m.pi) * theta
     return degree
-
-# Initilize frame counters.
-good_frames = 0
-bad_frames = 0
 
 # Font type.
 font = cv2.FONT_HERSHEY_SIMPLEX
@@ -116,6 +111,46 @@ def annotate_image(image, landmark_coordinates, w, h):
         # No pose detected - skip this frame
         cv2.putText(image, 'No pose detected - Position yourself in frame', (10, 30), font, 0.9, red, 2)
     return image
+
+def process_frame(image):
+    """
+    Process a single frame for pose detection and analysis
+    Returns pose landmarks and analysis results
+    """
+    try:
+        # Get image dimensions
+        h, w = image.shape[:2]
+        
+        # Convert BGR to RGB for MediaPipe
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        # Process the image with MediaPipe
+        results = pose.process(rgb_image)
+        
+        # Get landmark coordinates
+        landmarks = get_landmark_coordinates(results, w, h)
+        
+        # Annotate the image with pose landmarks
+        annotated_image = annotate_image(image.copy(), landmarks, w, h)
+        
+        # Convert annotated image back to base64 for response
+        import base64
+        _, buffer = cv2.imencode('.jpg', annotated_image)
+        annotated_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        # Extract pose analysis data
+        pose_data = {
+            'landmarks': landmarks,
+            'annotated_image': annotated_base64
+        }
+        
+        return pose_data
+        
+    except Exception as e:
+        return {
+            'error': str(e),
+            'landmarks': None
+        }
 
 '''
 def annotate_image(image, lm, lmPose, w, h):
