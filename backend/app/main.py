@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import health, sessions, tips
+from app.api.routes import health, sessions, tips, opencv
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -17,6 +17,7 @@ app.add_middleware(
 app.include_router(health.router, tags=["health"])
 app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 app.include_router(tips.router, tags=["tips"])
+app.include_router(opencv.router, tags=["opencv"])
 
 @app.get("/")
 def root():
