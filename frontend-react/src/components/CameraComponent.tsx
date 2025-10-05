@@ -195,21 +195,6 @@ const CameraComponent: React.FC<CameraComponentProps> = ({
           {isWorkoutActive ? 'Stop Workout' : 'Start Workout'}
         </button>
       </div>
-
-      <div className="workout-stats">
-        <div className="stat-item">
-          <span className="stat-label">Reps:</span>
-          <span className="stat-value">{repCount}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Exercise:</span>
-          <span className="stat-value">{exercise}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Status:</span>
-          <span className="stat-value">{isDetecting ? 'Rep Detected!' : 'Ready'}</span>
-        </div>
-      </div>
       
       <div className="demo-notice">
         <p><strong>Demo Mode:</strong> This is a simplified version. Full pose detection with MediaPipe will be added in the next update.</p>

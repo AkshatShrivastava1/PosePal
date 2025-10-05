@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import './LandingPage.css';
+import exerciseImage from '../assets/exercise.jpg';
 
 const LandingPage: React.FC = () => {
   return (
@@ -11,7 +12,7 @@ const LandingPage: React.FC = () => {
         <Link to="/workout" className="get-moving-btn">Get Started</Link>
       </div>
       <div className="landing-image">
-        <img src="/assets/landing.jpg" alt="Exercise Image" />
+        <img src={exerciseImage} alt="Exercise Image" />
       </div>
     </main>
   );
