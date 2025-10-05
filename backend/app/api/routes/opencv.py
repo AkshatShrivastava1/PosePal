@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.core.frame_processor import process_frame
+from app.services.frame_processor import process_frame
 from app.schemas.opencv import FrameRequest
 import cv2
 import base64
@@ -30,7 +30,6 @@ def process_frame_endpoint(request: FrameRequest):
         # Process the frame
         result = process_frame(opencv_image)
         
-        print(result)
         return {"status": "success", "result": result}
         
     except Exception as e:
