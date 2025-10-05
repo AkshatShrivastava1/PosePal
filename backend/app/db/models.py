@@ -4,7 +4,9 @@ from sqlmodel import SQLModel, Field
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    display_name: str | None = None
+    full_name: str | None = None
+    email: str
+    hashed_password: str
 
 class SessionDB(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -21,3 +23,12 @@ class SessionMetric(SQLModel, table=True):
     flags_json: str = "[]"
     duration_sec: int = 0
     ts: datetime
+
+class AnnotatedFrame(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="sessiondb.id")
+    frame_data: str  # Base64 encoded annotated frame
+    keyframe_type: str  # 'bottom', 'top', 'middle', 'plank_interval'
+    timestamp: datetime
+    exercise: str
+    pose_landmarks: str = "[]"  # JSON string of pose landmarks

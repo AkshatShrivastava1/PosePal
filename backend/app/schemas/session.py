@@ -12,7 +12,6 @@ class SessionStartResponse(BaseModel):
 class MetricsIngest(BaseModel):
     reps: int
     avg_score: float
-    flags: List[str] = []
     duration_sec: int
     ts: datetime
 
@@ -23,7 +22,6 @@ class SessionSummary(BaseModel):
     session_id: int
     total_reps: int
     avg_score: float
-    top_flags: list[str]
     duration_sec: int
     exercise: str
     start_ts: datetime

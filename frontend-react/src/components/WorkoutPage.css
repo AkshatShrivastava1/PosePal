@@ -31,6 +31,11 @@
   margin-bottom: 2rem;
 }
 
+/* Ensure analysis card has proper spacing */
+.workout-page > .posture-analysis-card {
+  margin-top: 2rem;
+}
+
 .exercise-selection {
   background: rgba(255, 255, 255, 0.95);
   padding: 2rem;
@@ -44,9 +49,28 @@
   font-size: 1.5rem;
 }
 
+.session-active-notice {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.session-active-notice p {
+  color: #856404;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .exercise-grid {
   display: grid;
   gap: 1rem;
+}
+
+.exercise-grid.disabled {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .exercise-card {
@@ -67,6 +91,17 @@
 .exercise-card.selected {
   border-color: #667eea;
   background: rgba(102, 126, 234, 0.1);
+}
+
+.exercise-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.exercise-card.disabled:hover {
+  border-color: #e0e0e0;
+  transform: none;
+  box-shadow: none;
 }
 
 .exercise-card h3 {
@@ -114,31 +149,6 @@
   font-size: 1.1rem;
 }
 
-.workout-history {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 2rem;
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.workout-history h3 {
-  color: #333;
-  margin-bottom: 1rem;
-}
-
-.metrics-list {
-  display: grid;
-  gap: 1rem;
-}
-
-.metric-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 10px;
-  color: #333;
-}
 
 @media (max-width: 1024px) {
   .workout-content {

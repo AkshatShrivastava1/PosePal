@@ -10,3 +10,8 @@ pytest==8.3.2
 google-generativeai==0.7.2
 opencv-python
 mediapipe
+passlib[bcrypt]
+python-jose[cryptography]
+Pillow
+numpy
+bcrypt==4.3.0

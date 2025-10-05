@@ -1,22 +1,51 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import CameraComponent from './CameraComponent';
+import PostureAnalysisCard from './PostureAnalysisCard';
+import { API_URLS } from '../constants/serverConfig';
 import './WorkoutPage.css';
 
 interface WorkoutMetrics {
   reps: number;
-  avgScore: number;
-  flags: string[];
   durationSec: number;
   timestamp: string;
+}
+
+interface MetricsIngest {
+  reps: number;
+  avg_score: number;
+  duration_sec: number;
+  ts: string; // ISO string format
+}
+
+interface PostureSuggestion {
+  category: string;
+  issue: string;
+  suggestion: string;
+  priority: 'High' | 'Medium' | 'Low';
+}
+
+interface PostureAnalysis {
+  overall_assessment: string;
+  strengths: string[];
+  areas_for_improvement: string[];
+  specific_suggestions: PostureSuggestion[];
+  exercise_specific_tips: string[];
+  next_session_focus: string;
 }
 
 const WorkoutPage: React.FC = () => {
   const [selectedExercise, setSelectedExercise] = useState('squat');
   const [isSessionActive, setIsSessionActive] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<number | null>(null);
   const [repCount, setRepCount] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [workoutMetrics, setWorkoutMetrics] = useState<WorkoutMetrics[]>([]);
+  
+  // Posture analysis state
+  const [postureAnalysis, setPostureAnalysis] = useState<PostureAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [completedSessionId, setCompletedSessionId] = useState<number | null>(null);
 
   const exercises = [
     { id: 'squat', name: 'Squats', description: 'Lower body strength exercise' },
@@ -27,14 +56,13 @@ const WorkoutPage: React.FC = () => {
 
   const startWorkoutSession = async () => {
     try {
-      const response = await fetch('http://localhost:8000/sessions/start', {
+      const response = await fetch(API_URLS.SESSIONS + '/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          exercise: selectedExercise,
-          user_id: 'user_123' // In a real app, this would come from auth
+          exercise: selectedExercise
         }),
       });
 
@@ -45,6 +73,7 @@ const WorkoutPage: React.FC = () => {
         setSessionStartTime(new Date());
         setRepCount(0);
         setWorkoutMetrics([]);
+        console.log(`Session started with id: ${data.session_id}`);
       } else {
         console.error('Failed to start session');
       }
@@ -58,7 +87,7 @@ const WorkoutPage: React.FC = () => {
 
     try {
       const now = new Date().toISOString();
-      const response = await fetch(`http://localhost:8000/sessions/${sessionId}/stop`, {
+      const response = await fetch(API_URLS.SESSIONS + `/${sessionId}/stop`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,9 +98,14 @@ const WorkoutPage: React.FC = () => {
       });
 
       if (response.ok) {
+        console.log(`Session stopped with id: ${sessionId}`);
         setIsSessionActive(false);
+        setCompletedSessionId(sessionId);
         setSessionId(null);
         setSessionStartTime(null);
+        
+        // Automatically trigger posture analysis
+        await analyzeSessionPosture(sessionId);
       } else {
         console.error('Failed to stop session');
       }
@@ -80,16 +114,56 @@ const WorkoutPage: React.FC = () => {
     }
   };
 
-  const sendWorkoutMetrics = async (metrics: WorkoutMetrics) => {
-    if (!sessionId) return;
+  const analyzeSessionPosture = async (sessionIdToAnalyze: number) => {
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    setPostureAnalysis(null);
 
     try {
-      const response = await fetch(`http://localhost:8000/sessions/${sessionId}/metrics`, {
+      const response = await fetch(`${API_URLS.ANALYSIS}/analyze-and-cleanup/${sessionIdToAnalyze}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(metrics),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.analysis && data.analysis.suggestions) {
+          setPostureAnalysis(data.analysis.suggestions);
+        } else {
+          setAnalysisError('Analysis completed but no suggestions were generated');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        setAnalysisError(errorData.message || 'Failed to analyze session');
+      }
+    } catch (error) {
+      setAnalysisError('Network error during analysis');
+      console.error('Error analyzing session:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const sendWorkoutMetrics = async (metrics: WorkoutMetrics) => {
+    if (!sessionId) return;
+
+    // Convert WorkoutMetrics to MetricsIngest format
+    const metricsIngest: MetricsIngest = {
+      reps: metrics.reps,
+      avg_score: 0.0, // Default score since we don't have form scoring yet
+      duration_sec: metrics.durationSec,
+      ts: metrics.timestamp
+    };
+
+    try {
+      const response = await fetch(API_URLS.SESSIONS + `/${sessionId}/metrics`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(metricsIngest),
       });
 
       if (response.ok) {
@@ -109,8 +183,6 @@ const WorkoutPage: React.FC = () => {
       const duration = Math.floor((Date.now() - sessionStartTime.getTime()) / 1000);
       const metrics: WorkoutMetrics = {
         reps: count,
-        avgScore: 0.8, // This would be calculated from pose analysis
-        flags: [], // This would be populated based on form analysis
         durationSec: duration,
         timestamp: new Date().toISOString()
       };
@@ -143,12 +215,17 @@ const WorkoutPage: React.FC = () => {
       <div className="workout-content">
         <div className="exercise-selection">
           <h2>Select Exercise</h2>
-          <div className="exercise-grid">
+          {isSessionActive && (
+            <div className="session-active-notice">
+              <p><strong>Session Active:</strong> Exercise selection is locked. Stop the current session to change exercises.</p>
+            </div>
+          )}
+          <div className={`exercise-grid ${isSessionActive ? 'disabled' : ''}`}>
             {exercises.map((exercise) => (
               <div
                 key={exercise.id}
-                className={`exercise-card ${selectedExercise === exercise.id ? 'selected' : ''}`}
-                onClick={() => setSelectedExercise(exercise.id)}
+                className={`exercise-card ${selectedExercise === exercise.id ? 'selected' : ''} ${isSessionActive ? 'disabled' : ''}`}
+                onClick={() => !isSessionActive && setSelectedExercise(exercise.id)}
               >
                 <h3>{exercise.name}</h3>
                 <p>{exercise.description}</p>
@@ -164,6 +241,7 @@ const WorkoutPage: React.FC = () => {
             onWorkoutStart={handleWorkoutStart}
             onWorkoutStop={handleWorkoutStop}
             exercise={selectedExercise}
+            sessionId={sessionId || undefined}
           />
         </div>
 
@@ -178,21 +256,15 @@ const WorkoutPage: React.FC = () => {
           </div>
         )}
 
-        {workoutMetrics.length > 0 && (
-          <div className="workout-history">
-            <h3>Workout History</h3>
-            <div className="metrics-list">
-              {workoutMetrics.map((metric, index) => (
-                <div key={index} className="metric-item">
-                  <span>Reps: {metric.reps}</span>
-                  <span>Score: {metric.avgScore}</span>
-                  <span>Duration: {metric.durationSec}s</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Posture Analysis Card - Full Width */}
+      <PostureAnalysisCard
+        analysis={postureAnalysis}
+        isLoading={isAnalyzing}
+        error={analysisError}
+        sessionId={completedSessionId}
+      />
     </div>
   );
 };
