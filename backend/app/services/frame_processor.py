@@ -1,6 +1,9 @@
 import cv2
 import math as m
 import mediapipe as mp
+import json
+from datetime import datetime
+from app.services.keyframe_detector import keyframe_detector
 
 # Calculate distance
 def findDistance(x1, y1, x2, y2):
@@ -112,23 +115,27 @@ def annotate_image(image, landmark_coordinates, w, h):
         cv2.putText(image, 'No pose detected - Position yourself in frame', (10, 30), font, 0.9, red, 2)
     return image
 
-def process_frame(image):
+def process_frame(image, session_id=None, exercise='squat'):
     """
     Process a single frame for pose detection and analysis
     Returns pose landmarks and analysis results
     """
+    print(f"🔍 [FRAME PROCESS START] Session {session_id}: Processing frame")
     try:
         # Get image dimensions
         h, w = image.shape[:2]
+        print(f"🔍 [FRAME PROCESS] Session {session_id}: Image dimensions {w}x{h}")
         
         # Convert BGR to RGB for MediaPipe
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
         # Process the image with MediaPipe
         results = pose.process(rgb_image)
+        print(f"🔍 [MEDIAPIPE] Session {session_id}: MediaPipe processed frame")
         
         # Get landmark coordinates
         landmarks = get_landmark_coordinates(results, w, h)
+        print(f"🔍 [LANDMARKS] Session {session_id}: Got {len(landmarks) if landmarks else 0} landmarks")
         
         # Annotate the image with pose landmarks
         annotated_image = annotate_image(image.copy(), landmarks, w, h)
@@ -138,73 +145,50 @@ def process_frame(image):
         _, buffer = cv2.imencode('.jpg', annotated_image)
         annotated_base64 = base64.b64encode(buffer).decode('utf-8')
         
+        # Check if this should be saved as a keyframe and if rep was completed
+        keyframe_type = None
+        rep_completed = False
+        if session_id is not None:
+            # Convert landmarks to list format for keyframe detector
+            landmarks_list = []
+            if landmarks:
+                for landmark_name, (x, y) in landmarks.items():
+                    landmarks_list.append({
+                        'name': landmark_name.name,
+                        'x': x / w,  # Normalize coordinates to 0-1 range
+                        'y': y / h   # Normalize coordinates to 0-1 range
+                    })
+            
+            print(f"🔍 [POSE DEBUG] Session {session_id}: {len(landmarks)} landmarks detected")
+            if landmarks_list:
+                print(f"🔍 [POSE DEBUG] Sample landmarks: {landmarks_list[:3]}")
+            
+            keyframe_type, rep_completed = keyframe_detector.should_save_keyframe(
+                session_id, exercise, landmarks_list, datetime.now()
+            )
+            
+            print(f"🔍 [KEYFRAME DEBUG] Session {session_id}: keyframe_type={keyframe_type}, rep_completed={rep_completed}")
+            print(f"🔍 [REP DEBUG] Session {session_id}: current_rep_count={keyframe_detector.get_rep_count(session_id)}")
+        
         # Extract pose analysis data
         pose_data = {
             'landmarks': landmarks,
-            'annotated_image': annotated_base64
+            'annotated_image': annotated_base64,
+            'keyframe_type': keyframe_type,
+            'should_save_keyframe': keyframe_type is not None,
+            'rep_completed': rep_completed,
+            'current_rep_count': keyframe_detector.get_rep_count(session_id) if session_id else 0
         }
         
         return pose_data
         
     except Exception as e:
+        print(f"❌ [FRAME PROCESS ERROR] Session {session_id}: {str(e)}")
         return {
             'error': str(e),
-            'landmarks': None
+            'landmarks': None,
+            'keyframe_type': None,
+            'should_save_keyframe': False,
+            'rep_completed': False,
+            'current_rep_count': 0
         }
-
-'''
-def annotate_image(image, lm, lmPose, w, h):
-    # Check if pose landmarks are detected
-    if lm is not None:
-        # Acquire the landmark coordinates.
-        # Once aligned properly, left or right should not be a concern.      
-        # Left shoulder.
-        l_shldr_x = int(lm.landmark[lmPose.LEFT_SHOULDER].x * w)
-        l_shldr_y = int(lm.landmark[lmPose.LEFT_SHOULDER].y * h)
-        # Right shoulder
-        r_shldr_x = int(lm.landmark[lmPose.RIGHT_SHOULDER].x * w)
-        r_shldr_y = int(lm.landmark[lmPose.RIGHT_SHOULDER].y * h)
-        # Left ear.
-        l_ear_x = int(lm.landmark[lmPose.LEFT_EAR].x * w)
-        l_ear_y = int(lm.landmark[lmPose.LEFT_EAR].y * h)
-        # Left hip.
-        l_hip_x = int(lm.landmark[lmPose.LEFT_HIP].x * w)
-        l_hip_y = int(lm.landmark[lmPose.LEFT_HIP].y * h)
-    else:
-        # No pose detected - skip this frame
-        cv2.putText(image, 'No pose detected - Position yourself in frame', (10, 30), font, 0.9, red, 2)
-        return image
-
-    # Calculate distance between left shoulder and right shoulder points.
-    offset = findDistance(l_shldr_x, l_shldr_y, r_shldr_x, r_shldr_y)
-
-    # Assist to align the camera to point at the side view of the person.
-    # Offset threshold 30 is based on results obtained from analysis over 100 samples.
-    if offset < 100:
-        cv2.putText(image, str(int(offset)) + ' Aligned', (w - 150, 30), font, 0.9, green, 2)
-    else:
-        cv2.putText(image, str(int(offset)) + ' Not Aligned', (w - 150, 30), font, 0.9, red, 2)
-
-    # Calculate angles.
-    neck_inclination = findAngle(l_shldr_x, l_shldr_y, l_ear_x, l_ear_y)
-    torso_inclination = findAngle(l_hip_x, l_hip_y, l_shldr_x, l_shldr_y)
-
-    # Draw landmarks.
-    cv2.circle(image, (l_shldr_x, l_shldr_y), 7, yellow, -1)
-    cv2.circle(image, (l_ear_x, l_ear_y), 7, yellow, -1)
-
-    # Let's take y - coordinate of P3 100px above x1,  for display elegance.
-    # Although we are taking y = 0 while calculating angle between P1,P2,P3.
-    cv2.circle(image, (l_shldr_x, l_shldr_y - 100), 7, yellow, -1)
-    cv2.circle(image, (r_shldr_x, r_shldr_y), 7, pink, -1)
-    cv2.circle(image, (l_hip_x, l_hip_y), 7, yellow, -1)
-
-    # Similarly, here we are taking y - coordinate 100px above x1. Note that
-    # you can take any value for y, not necessarily 100 or 200 pixels.
-    cv2.circle(image, (l_hip_x, l_hip_y - 100), 7, yellow, -1)
-
-    cv2.line(image, (l_shldr_x, l_shldr_y), (l_ear_x, l_ear_y), red, 4)
-
-    return image
-
-'''

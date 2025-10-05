@@ -1,5 +1,6 @@
 import React from 'react';
 import './AboutPage.css';
+import exerciseImage from '../assets/exercise.jpg';
 
 const AboutPage: React.FC = () => {
   return (
@@ -20,7 +21,7 @@ const AboutPage: React.FC = () => {
         </p>
       </div>
       <div className="about-image">
-        <img src="/assets/exercise.jpg" alt="Exercise Image" />
+        <img src={exerciseImage} alt="Exercise Image" />
       </div>
     </main>
   );

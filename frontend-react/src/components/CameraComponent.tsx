@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import './CameraComponent.css';
-
-const SERVER_URL = 'http://127.0.0.1:8000';
+import { API_URLS } from '../constants/serverConfig';
 
 interface CameraComponentProps {
   onPoseDetected?: (landmarks: any) => void;
@@ -9,13 +8,15 @@ interface CameraComponentProps {
   onWorkoutStart?: () => void;
   onWorkoutStop?: () => void;
   exercise?: string;
+  sessionId?: number;
 }
 
 const CameraComponent: React.FC<CameraComponentProps> = ({  
   onRepCount, 
   onWorkoutStart,
   onWorkoutStop,
-  exercise = 'squat' 
+  exercise = 'squat',
+  sessionId
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,14 +33,15 @@ const CameraComponent: React.FC<CameraComponentProps> = ({
       });
       
       videoRef.current.srcObject = stream;
-      videoRef.current.play();
-      setIsWorkoutActive(true);
       
-      // Start drawing video to canvas
-      drawVideoToCanvas();
+      // Wait for video to be ready before starting
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current?.play();
+        setIsWorkoutActive(true);
+        console.log('Video loaded and playing');
+      };
       
-      // Start rep counting simulation
-      startRepCounting();
+      // Rep counting is now handled by backend pose analysis
       
       // Notify parent component
       if (onWorkoutStart) {
@@ -66,29 +68,6 @@ const CameraComponent: React.FC<CameraComponentProps> = ({
     }
   };
 
-  const startRepCounting = () => {
-    // Simple demo rep counting - in real implementation this would use pose detection
-    const interval = setInterval(() => {
-      if (!isWorkoutActive) {
-        clearInterval(interval);
-        return;
-      }
-      
-      // Simulate rep detection
-      if (Math.random() > 0.7) {
-        const newCount = repCount + 1;
-        setRepCount(newCount);
-        setIsDetecting(true);
-        
-        if (onRepCount) {
-          onRepCount(newCount);
-        }
-        
-        // Reset detection state after a short delay
-        setTimeout(() => setIsDetecting(false), 1000);
-      }
-    }, 2000);
-  };
 
   const drawVideoToCanvas = () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -97,32 +76,31 @@ const CameraComponent: React.FC<CameraComponentProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Ensure video is ready and has dimensions
+    if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+      return;
+    }
+    
+    // Clear canvas first
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw video frame
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-    
-    // Draw a simple overlay to show the component is working
-    ctx.strokeStyle = '#00FF00';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(50, 50, canvas.width - 100, canvas.height - 100);
-    
-    ctx.fillStyle = '#FF0000';
-    ctx.font = '20px Arial';
-    ctx.fillText('Camera Active - Pose Detection Coming Soon', 50, 50);
-    
-    // Draw rep count
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 24px Arial';
-    ctx.fillText(`Reps: ${repCount}`, 50, canvas.height - 50);
     
     if (isDetecting) {
       ctx.fillStyle = '#00FF00';
       ctx.font = 'bold 20px Arial';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.strokeText('REP DETECTED!', 50, canvas.height - 80);
       ctx.fillText('REP DETECTED!', 50, canvas.height - 80);
     }
+    
     return canvas;
   };
 
   const sendFrameToBackend = (canvas: HTMLCanvasElement | undefined) => {
-    if (!canvas) return;
+    if (!canvas || !sessionId) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
@@ -130,13 +108,7 @@ const CameraComponent: React.FC<CameraComponentProps> = ({
     const dataURL = canvas.toDataURL('image/jpeg');
     const base64Data = dataURL.split(',')[1]; // Remove "data:image/jpeg;base64," prefix
     
-    console.log('Sending frame to backend:', {
-      url: `${SERVER_URL}/frames`,
-      dataLength: base64Data.length,
-      dataPreview: base64Data.substring(0, 50) + '...'
-    });
-    
-    fetch(`${SERVER_URL}/frames`, {
+    fetch(API_URLS.FRAMES + `/${sessionId}`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -144,29 +116,57 @@ const CameraComponent: React.FC<CameraComponentProps> = ({
       body: JSON.stringify({ frame: base64Data }),
     })
     .then(response => {
-      console.log('Response status:', response.status);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       return response.json();
     })
     .then(data => {
-      console.log('Frame processed successfully:', data);
+      // Handle rep counting from backend
+      if (data.result && data.result.current_rep_count !== undefined) {
+        const newCount = data.result.current_rep_count;
+        setRepCount(newCount);
+        
+        if (onRepCount) {
+          onRepCount(newCount);
+        }
+      }
+      
+      // Handle rep completion detection
+      if (data.result && data.result.rep_completed) {
+        // Show rep detected indicator
+        setIsDetecting(true);
+        setTimeout(() => setIsDetecting(false), 2000);
+      }
     })
     .catch(error => {
       console.error('Error sending frame:', error);
     });
   };
 
+  // Continuous canvas drawing when workout is active
   useEffect(() => {
     if (isWorkoutActive && videoRef.current) {
+      const drawFrame = () => {
+        drawVideoToCanvas();
+        requestAnimationFrame(drawFrame);
+      };
+      drawFrame();
+    }
+  }, [isWorkoutActive, repCount, isDetecting]);
+
+  // Send frames to backend
+  useEffect(() => {
+    if (isWorkoutActive && sessionId) {
       const interval = setInterval(() => {
-        const canvas = drawVideoToCanvas();
-        sendFrameToBackend(canvas);
+        const canvas = canvasRef.current;
+        if (canvas) {
+          sendFrameToBackend(canvas);
+        }
       }, 100);
       return () => clearInterval(interval);
     }
-  }, [isWorkoutActive, repCount, isDetecting]);
+  }, [isWorkoutActive, sessionId]);
 
   return (
     <div className="camera-container">
@@ -175,6 +175,9 @@ const CameraComponent: React.FC<CameraComponentProps> = ({
           ref={videoRef}
           className="camera-video"
           style={{ display: 'none' }}
+          autoPlay
+          muted
+          playsInline
         />
         <canvas
           ref={canvasRef}

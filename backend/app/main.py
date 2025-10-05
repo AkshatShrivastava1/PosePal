@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-from app.api.routes import health, sessions, tips, auth
+from app.api.routes import health, sessions, tips, auth, keyframes, posture_analysis
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -33,6 +33,8 @@ app.include_router(health.router, tags=["health"])
 app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 app.include_router(tips.router, tags=["tips"])
 app.include_router(opencv.router, tags=["opencv"])
+app.include_router(keyframes.router, prefix="/keyframes", tags=["keyframes"])
+app.include_router(posture_analysis.router, prefix="/analysis", tags=["posture-analysis"])
 
 @app.get("/")
 def root():

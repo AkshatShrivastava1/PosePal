@@ -1,14 +1,24 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { AuthService } from '../services/authService';
 import './Header.css';
 
 const Header: React.FC = () => {
   const location = useLocation();
+  const isAuthenticated = AuthService.isAuthenticated();
+
+  const handleLogout = () => {
+    AuthService.removeToken();
+    window.location.href = '/';
+  };
 
   return (
     <header className="top-nav">
       <div className="logo">
-        <img src="/assets/PosePal.png" alt="PosePal Logo" />
+        <div className="logo-placeholder">
+          <i className="fa-solid fa-dumbbell"></i>
+          <span>PosePal</span>
+        </div>
       </div>
       <nav>
         <ul>
@@ -24,17 +34,30 @@ const Header: React.FC = () => {
           </li>
         </ul>
       </nav>
-      <div className="profile">
-        <img src="/assets/profile.jpg" alt="User Profile" className="profile-pic" />
-        <div className="profile-info">
-          <span>Jose Simmons</span>
-          <small>User</small>
+      
+      {isAuthenticated ? (
+        <div className="profile">
+          <img src="/assets/profile.jpg" alt="User Profile" className="profile-pic" />
+          <div className="profile-info">
+            <span>User</span>
+            <small>Logged In</small>
+          </div>
+          <div className="profile-actions">
+            <button onClick={handleLogout} className="logout-btn" title="Logout">
+              <i className="fa-solid fa-sign-out-alt"></i>
+            </button>
+          </div>
         </div>
-        <div className="profile-actions">
-          <i className="fa-solid fa-gear"></i>
-          <i className="fa-solid fa-ellipsis-vertical"></i>
+      ) : (
+        <div className="auth-buttons">
+          <Link to="/login" className="auth-btn login-btn">
+            <i className="fa-solid fa-sign-in-alt"></i> Login
+          </Link>
+          <Link to="/signup" className="auth-btn signup-btn">
+            <i className="fa-solid fa-user-plus"></i> Sign Up
+          </Link>
         </div>
-      </div>
+      )}
     </header>
   );
 };

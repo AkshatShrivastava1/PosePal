@@ -1,7 +1,6 @@
-import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
-from datetime import datetime
+from datetime import datetime, timezone
 from app.db.session import get_session, init_db
 from app.db.models import SessionDB, SessionMetric
 from app.schemas.session import (
@@ -14,7 +13,7 @@ init_db()
 
 @router.post("/start", response_model=SessionStartResponse)
 def start_session(payload: SessionStartRequest, db: SQLSession = Depends(get_session)):
-    s = SessionDB(exercise=payload.exercise, user_id=payload.user_id, start_ts=datetime.utcnow())
+    s = SessionDB(exercise=payload.exercise, user_id=payload.user_id, start_ts=datetime.now(timezone.utc))
     db.add(s)
     db.commit()
     db.refresh(s)
@@ -29,7 +28,7 @@ def ingest_metrics(session_id: int, m: MetricsIngest, db: SQLSession = Depends(g
         session_id=session_id,
         reps=m.reps,
         avg_score=m.avg_score,
-        flags_json=json.dumps(m.flags),
+        flags_json="[]",  # Empty flags array
         duration_sec=m.duration_sec,
         ts=m.ts,
     )
@@ -55,23 +54,12 @@ def session_summary(session_id: int, db: SQLSession = Depends(get_session)):
     metrics = db.exec(select(SessionMetric).where(SessionMetric.session_id == session_id)).all()
     total_reps = sum(m.reps for m in metrics)
     avg_score = (sum(m.avg_score for m in metrics) / len(metrics)) if metrics else 0.0
-
-    from collections import Counter
-    c = Counter()
-    for m in metrics:
-        try:
-            flags = json.loads(m.flags_json)
-        except Exception:
-            flags = []
-        c.update(flags)
-    top_flags = [f for f, _ in c.most_common(5)]
     duration = sum(m.duration_sec for m in metrics)
 
     return SessionSummary(
         session_id=session_id,
         total_reps=total_reps,
-        avg_score=round(avg_score, 2),
-        top_flags=top_flags,
+        avg_score=avg_score,
         duration_sec=duration,
         exercise=s.exercise,
         start_ts=s.start_ts,

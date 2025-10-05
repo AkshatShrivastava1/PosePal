@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, Session, create_engine
+from app.db.models import *
 
 DATABASE_URL = "sqlite:///trainer.db"
 engine = create_engine(DATABASE_URL, echo=True)
@@ -6,3 +7,7 @@ engine = create_engine(DATABASE_URL, echo=True)
 def get_db():
     with Session(engine) as session:
         yield session
+
+def create_db_and_tables():
+    """Create all database tables"""
+    SQLModel.metadata.create_all(engine)
