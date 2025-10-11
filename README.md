@@ -1,6 +1,4 @@
-# AI Trainer Backend (FastAPI)
-
-Backend service for the AI Personal Trainer (pose detection + form coaching).
+AI Personal Trainer (pose detection + form coaching).
 
 ## Local
 ```bash
